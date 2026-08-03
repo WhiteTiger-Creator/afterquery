@@ -1,0 +1,54 @@
+{
+  "README.md": {
+    "bytes": 1630,
+    "sha256": "0fd8409cf672e62e232f29ddc55ec4426423f25be03cf2932130217b923e7963"
+  },
+  "compress.sh": {
+    "bytes": 543,
+    "sha256": "aec3ae459456a4e5e99acb7c9aa097c36ba5bb5569f918749c8b8dbc58c6a5b5"
+  },
+  "corpus/holdout.pgn": {
+    "bytes": 2351160,
+    "sha256": "969240eb3a372e13cf62301b8c6b017c090e4135cc6c1cb39a88e0e66c3dba24"
+  },
+  "corpus/train.pgn": {
+    "bytes": 17214587,
+    "sha256": "6998cf12b29a3151d27c73b6a1e40ea6f6f8f00a87e04fe1e98d055daed8069b"
+  },
+  "decompress.sh": {
+    "bytes": 421,
+    "sha256": "b33d5d19945e3f1f4341d0f5b2bc8b68d951fb44e0b40e6d742cecbeb8d98a82"
+  },
+  "pgnpack/__init__.py": {
+    "bytes": 217,
+    "sha256": "fec4235e2a282145b0c983fb1da9939b770e90d9e5703b330119eee3196bc356"
+  },
+  "pgnpack/__main__.py": {
+    "bytes": 1354,
+    "sha256": "736286a5a03841b5f31e5f08e891dfa980f1213ead9800a25cf60caada7d751e"
+  },
+  "pgnpack/codec.py": {
+    "bytes": 5581,
+    "sha256": "0b7bca8e3839fa72b244ca6c13d2d57ea80547c49bc6934a9459d6db0f379918"
+  },
+  "pgnpack/rangecoder.py": {
+    "bytes": 3190,
+    "sha256": "3f182a2bd5dc40d2c920a94a7871365323c258c96fb2eaf0b7b4d843337f6bbc"
+  },
+  "scoring.json": {
+    "bytes": 169,
+    "sha256": "3fd65a420f7ec726f3e127be4a5de3920f78cc8879d95409e1f40a5474811196"
+  },
+  "selfcheck.py": {
+    "bytes": 5477,
+    "sha256": "4d0373cdafae87fae52adcfe8c827e75dc3a4cf2fee466d5a2b6b3b4461c26d9"
+  },
+  "selfcheck.sh": {
+    "bytes": 259,
+    "sha256": "06006e1a5c534774d4a08966014f8e61e3ba760ea2bf7533a91ff822ea0bad6f"
+  },
+  "timer.sh": {
+    "bytes": 1741,
+    "sha256": "39efae1f67c5f37b5dcbf5454f348a9a08469e96398f7b760f476b4cbadfdccd"
+  }
+}

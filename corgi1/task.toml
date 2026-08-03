@@ -1,0 +1,42 @@
+version = "2.0"
+
+[task]
+name = "afterquery/corgi1"
+description = """
+Build a lossless compressor for a chess game archive in PGN format. A working
+legal-move-index coder is supplied as the starting point; the score measures how far
+below its output size the submission gets on a separate archive drawn from a different
+population of games. Decompression must reproduce the archive byte for byte.
+"""
+
+[metadata]
+author_name = "anonymous"
+author_email = "anonymous"
+category = "machine-learning"
+difficulty = "hard"
+tags = [
+    "lossless-compression",
+    "entropy-coding",
+    "sequence-modelling",
+    "generalisation",
+    "python",
+]
+languages = ["python"]
+
+[agent]
+# Long-horizon: the improvement curve has no natural stopping point, so the budget is
+# set well past the point where the obvious wins are exhausted.
+timeout_sec = 28800
+
+[verifier]
+# One compress and one decompress pass over the graded collection, each capped at forty
+# minutes, plus hashing and accounting.
+timeout_sec = 7200
+
+[environment]
+allow_internet = false
+build_timeout_sec = 1800
+cpus = 4
+memory_mb = 16384
+gpus = 0
+storage_mb = 20480
