@@ -12,10 +12,14 @@ file to produce anything but zero.
 The interesting problem is that packing and unpacking run in the same container, so the
 cheapest possible "compressor" is one that writes the original somewhere and reads it back
 later. Guarding a fixed list of directories does not close that — there is always another
-writable path. So the rule here is stated over behaviour rather than location: the entire
-filesystem is snapshotted before packing, and anything created or altered while packing,
-outside the archive directory itself, is both charged to the footprint and deleted before
-the rebuild runs. Stashing the corpus therefore costs exactly as much as putting it in the
+writable path, and naming subtrees to skip is worse still, since a name like /dev looks
+inert while containing /dev/shm, which is a tmpfs that will hold gigabytes quite happily.
+
+So the rule here is stated over behaviour rather than location, and the exclusions are
+derived from the live mount table rather than written down: every filesystem is walked
+unless its type cannot store a regular file at all. The entire filesystem is snapshotted
+before packing, and anything created or altered while packing, outside the archive
+directory itself, is both charged to the footprint and deleted before the rebuild runs. Stashing the corpus therefore costs exactly as much as putting it in the
 archive would have, and it is gone by the time the rebuild could read it. Processes started
 during packing are killed for the same reason: a daemon holding the plaintext in memory is
 just a stash with extra steps.
@@ -68,9 +72,52 @@ TIMER_FILES = frozenset(
     }
 )
 
-#: Kernel-backed trees with no stable on-disk content, plus the verifier's own data. These
-#: are the only places excluded from the filesystem diff.
-PSEUDO_ROOTS = ("/proc", "/sys", "/dev")
+#: Filesystem types that cannot hold an ordinary file a submission could park bytes in.
+#: Anything not on this list is walked, whatever it is mounted as — the exclusions are
+#: derived from the live mount table rather than from a list of paths, because a path list
+#: is only ever as good as the author's imagination. /dev is a case in point: most of it is
+#: device nodes, but /dev/shm is a perfectly ordinary tmpfs that will happily hold
+#: gigabytes, so excluding the subtree by name would leave a hole.
+INERT_FSTYPES = frozenset(
+    {
+        "autofs",
+        "binfmt_misc",
+        "bpf",
+        "cgroup",
+        "cgroup2",
+        "configfs",
+        "debugfs",
+        "devpts",
+        "fusectl",
+        "mqueue",
+        "nsfs",
+        "proc",
+        "pstore",
+        "rpc_pipefs",
+        "securityfs",
+        "selinuxfs",
+        "sysfs",
+        "tracefs",
+    }
+)
+
+
+def inert_mountpoints() -> tuple[str, ...]:
+    """Mount points whose filesystem cannot store a regular file.
+
+    Read from /proc/mounts so that a filesystem nobody anticipated is scanned by default
+    rather than skipped by default. /proc and /sys are added unconditionally: if the mount
+    table cannot be read at all, those two still must not be walked.
+    """
+    skip = {"/proc", "/sys"}
+    try:
+        for line in Path("/proc/mounts").read_text().splitlines():
+            fields = line.split()
+            if len(fields) >= 3 and fields[2] in INERT_FSTYPES:
+                skip.add(fields[1])
+    except OSError:
+        pass
+    return tuple(sorted(skip))
 
 
 def sha256_file(path: Path) -> str:
@@ -118,7 +165,7 @@ def unshipped_bytes(manifest: dict) -> tuple[int, list[dict]]:
 # --------------------------------------------------------------------------- filesystem
 
 def _excluded(path: str, extra: tuple[str, ...]) -> bool:
-    for root in PSEUDO_ROOTS + extra:
+    for root in extra:
         if path == root or path.startswith(root + "/"):
             return True
     return False
@@ -303,9 +350,11 @@ def main() -> int:
     archive = work / "archive"
     rebuilt = work / "rebuilt.pgn"
 
-    # The verifier's own data and working area are the only things the diff ignores; the
-    # archive has to be exempt because producing it is the whole point.
-    excludes = (str(HERE), str(REPORT_DIR), str(work))
+    # Everything is walked except filesystems that cannot hold a regular file, plus the
+    # verifier's own data and working area. The archive lives inside the working area and
+    # is exempt because producing it is the whole point.
+    inert = inert_mountpoints()
+    excludes = inert + (str(HERE), str(REPORT_DIR), str(work))
 
     try:
         pids_before = snapshot_pids()
@@ -388,6 +437,7 @@ def main() -> int:
                 "unshipped_detail": unshipped_detail[:50],
                 "stashed_detail": stashed_detail[:50],
                 "processes_killed": len(killed),
+                "excluded_mounts": list(inert),
             }
         )
         return 0
