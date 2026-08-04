@@ -1,0 +1,12 @@
+[solve] installing the reference codec
+[solve] training the move model on the local corpus
+extracting from /app/corpus/train.pgn ...
+  extracted 2000 games  95/s
+  extracted 4000 games  96/s
+  extracted 6000 games  95/s
+  extracted 8000 games  96/s
+  extracted 10000 games  96/s
+  extracted 12000 games  96/s
+  extracted 14000 games  95/s
+  extracted 16000 games  95/s
+  extracted 18000 games  95/s

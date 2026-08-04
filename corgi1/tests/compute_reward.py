@@ -2,13 +2,23 @@
 
 The measurement is deliberately blunt. Pack the graded archive, throw the original away,
 unpack it, and require the result to match byte for byte. Then add up everything the
-submission needs in order to have done that — the archive directory plus anything left
-under /app that was not shipped — and turn that total into a score against two fixed
-reference points.
+submission needed in order to have done that, and turn the total into a score against two
+fixed reference points.
 
 Correctness is a gate, not a component: a rebuild that differs anywhere scores zero no
 matter how small the archive was. There is no way for a crash, a timeout, or a missing
 file to produce anything but zero.
+
+The interesting problem is that packing and unpacking run in the same container, so the
+cheapest possible "compressor" is one that writes the original somewhere and reads it back
+later. Guarding a fixed list of directories does not close that — there is always another
+writable path. So the rule here is stated over behaviour rather than location: the entire
+filesystem is snapshotted before packing, and anything created or altered while packing,
+outside the archive directory itself, is both charged to the footprint and deleted before
+the rebuild runs. Stashing the corpus therefore costs exactly as much as putting it in the
+archive would have, and it is gone by the time the rebuild could read it. Processes started
+during packing are killed for the same reason: a daemon holding the plaintext in memory is
+just a stash with extra steps.
 """
 
 from __future__ import annotations
@@ -17,6 +27,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -36,9 +47,30 @@ REPORT_DIR = Path(os.environ.get("REWARD_DIR", "/logs/verifier"))
 COMPRESS_TIMEOUT = int(os.environ.get("COMPRESS_TIMEOUT", "2400"))
 DECOMPRESS_TIMEOUT = int(os.environ.get("DECOMPRESS_TIMEOUT", "2400"))
 
-#: Directories under /app whose contents are derived rather than authored. Everything
-#: else that differs from the manifest counts against the submission.
-IGNORED_PREFIXES = ("__pycache__", ".timer", ".git")
+#: Subtrees of /app whose contents are derived rather than authored. They are exempt from
+#: the manifest comparison, but NOT from the filesystem diff below — otherwise they would
+#: be the one place under /app where bytes could be parked for free.
+DERIVED_SUBDIRS = ("__pycache__", ".timer", ".git")
+
+#: Files the platform's timer daemon owns and rewrites continuously. They are tiny, fixed
+#: in name, and not under the submission's control, so churn in them is ignored rather than
+#: charged — anything else appearing in .timer is treated like any other stash.
+TIMER_FILES = frozenset(
+    {
+        "timer.pid",
+        "start_epoch",
+        "budget_secs",
+        "remaining_secs",
+        "elapsed_secs",
+        "alert_30min",
+        "alert_10min",
+        "alert_5min",
+    }
+)
+
+#: Kernel-backed trees with no stable on-disk content, plus the verifier's own data. These
+#: are the only places excluded from the filesystem diff.
+PSEUDO_ROOTS = ("/proc", "/sys", "/dev")
 
 
 def sha256_file(path: Path) -> str:
@@ -64,13 +96,13 @@ def unshipped_bytes(manifest: dict) -> tuple[int, list[dict]]:
     total = 0
     details: list[dict] = []
     for path in sorted(APP.rglob("*")):
-        if not path.is_file():
+        if not path.is_file() or path.is_symlink():
             continue
         try:
             rel = path.relative_to(APP).as_posix()
         except ValueError:  # pragma: no cover - defensive
             continue
-        if any(part in IGNORED_PREFIXES for part in rel.split("/")):
+        if any(part in DERIVED_SUBDIRS for part in rel.split("/")):
             continue
         entry = manifest.get(rel)
         size = path.stat().st_size
@@ -83,46 +115,142 @@ def unshipped_bytes(manifest: dict) -> tuple[int, list[dict]]:
     return total, details
 
 
-#: Places a submission could stash data between packing and unpacking. Both halves run in
-#: the same container, so without clearing these the corpus could simply be left in /tmp
-#: during compression and read back during the rebuild, costing nothing.
-SCRATCH_DIRS = ("/tmp", "/var/tmp", "/dev/shm", "/root", "/home", "/opt", "/srv")
+# --------------------------------------------------------------------------- filesystem
+
+def _excluded(path: str, extra: tuple[str, ...]) -> bool:
+    for root in PSEUDO_ROOTS + extra:
+        if path == root or path.startswith(root + "/"):
+            return True
+    return False
 
 
-def snapshot_scratch() -> dict[str, set[str]]:
-    snap: dict[str, set[str]] = {}
-    for d in SCRATCH_DIRS:
-        p = Path(d)
-        if p.is_dir():
-            try:
-                snap[d] = set(os.listdir(d))
-            except OSError:
-                snap[d] = set()
+def snapshot_tree(extra_excludes: tuple[str, ...]) -> dict[str, tuple[int, int]]:
+    """Record (size, ctime) for every regular file on the filesystem.
+
+    `st_ctime_ns` moves whenever an inode is written and cannot be set backwards by
+    `utime`, so a submission cannot hide a modification by restoring timestamps.
+    """
+    snap: dict[str, tuple[int, int]] = {}
+    stack = ["/"]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    path = entry.path
+                    if _excluded(path, extra_excludes):
+                        continue
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(path)
+                        elif entry.is_file(follow_symlinks=False):
+                            st = entry.stat(follow_symlinks=False)
+                            snap[path] = (st.st_size, st.st_ctime_ns)
+                    except OSError:
+                        continue
+        except OSError:
+            continue
     return snap
 
 
-def scrub_scratch(snap: dict[str, set[str]], keep: Path) -> list[str]:
-    """Remove anything created outside /app and the archive since the snapshot."""
-    removed = []
-    for d, before in snap.items():
-        try:
-            current = set(os.listdir(d))
-        except OSError:
-            continue
-        for name in current - before:
-            target = Path(d) / name
-            if target == keep or keep.is_relative_to(target):
-                continue
-            try:
-                if target.is_dir() and not target.is_symlink():
-                    shutil.rmtree(target, ignore_errors=True)
-                else:
-                    target.unlink(missing_ok=True)
-                removed.append(str(target))
-            except OSError:
-                pass
-    return removed
+def _chargeable(path: str) -> bool:
+    """Whether a changed path counts as a stash.
 
+    Files under /app are already priced by the manifest, except inside the derived
+    subtrees — those are exempt from the manifest and so must be priced here instead. The
+    timer daemon's own files are the single exception, because the platform rewrites them
+    on its own schedule and their churn has nothing to do with the submission.
+    """
+    if path.startswith("/app/"):
+        rel = path[len("/app/") :]
+        parts = rel.split("/")
+        if not any(part in DERIVED_SUBDIRS for part in parts):
+            return False  # priced by the manifest
+        if ".timer" in parts and parts[-1] in TIMER_FILES:
+            return False
+    return True
+
+
+def diff_and_scrub(
+    before: dict[str, tuple[int, int]], extra_excludes: tuple[str, ...]
+) -> tuple[int, list[dict]]:
+    """Charge and remove everything written outside the archive while packing."""
+    after = snapshot_tree(extra_excludes)
+    total = 0
+    details: list[dict] = []
+
+    for path, meta in sorted(after.items()):
+        if before.get(path) == meta:
+            continue
+        if not _chargeable(path):
+            continue
+        size = meta[0]
+        total += size
+        details.append(
+            {
+                "path": path,
+                "bytes": size,
+                "why": "created" if path not in before else "modified",
+            }
+        )
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    return total, details
+
+
+# ----------------------------------------------------------------------------- processes
+
+def snapshot_pids() -> set[int]:
+    return {int(p.name) for p in Path("/proc").iterdir() if p.name.isdigit()}
+
+
+def _ancestry(pid: int) -> list[int]:
+    chain = []
+    for _ in range(64):
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text()
+        except OSError:
+            break
+        try:
+            ppid = int(stat.rsplit(")", 1)[1].split()[1])
+        except (IndexError, ValueError):
+            break
+        chain.append(ppid)
+        if ppid <= 1:
+            break
+        pid = ppid
+    return chain
+
+
+def kill_new_processes(before: set[int]) -> list[int]:
+    """Stop anything the packing step left running.
+
+    A process started while packing could be holding the corpus in memory and handing it
+    back during the rebuild. The verifier's own ancestry is left alone.
+    """
+    me = os.getpid()
+    protected = {me, 1} | set(_ancestry(me))
+    killed = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        if pid in before or pid in protected:
+            continue
+        try:
+            os.kill(pid, signal.SIGKILL)
+            killed.append(pid)
+        except OSError:
+            pass
+    return killed
+
+
+# -------------------------------------------------------------------------------- report
 
 def write_report(payload: dict) -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -175,8 +303,14 @@ def main() -> int:
     archive = work / "archive"
     rebuilt = work / "rebuilt.pgn"
 
+    # The verifier's own data and working area are the only things the diff ignores; the
+    # archive has to be exempt because producing it is the whole point.
+    excludes = (str(HERE), str(REPORT_DIR), str(work))
+
     try:
-        scratch_before = snapshot_scratch()
+        pids_before = snapshot_pids()
+        tree_before = snapshot_tree(excludes)
+
         shutil.copyfile(GRADED_PGN, source)
         original_bytes = source.stat().st_size
         original_digest = sha256_file(GRADED_PGN)
@@ -189,16 +323,33 @@ def main() -> int:
         if not archive.is_dir():
             return fail("compress.sh did not create the archive directory")
 
-        # The rebuild must come from the archive, not from the file we just packed, and
-        # not from anything left lying around during packing.
+        archive_bytes = directory_size(archive)
+
+        # The rebuild must come from the archive alone: not from the file we just packed,
+        # not from anything parked elsewhere on disk, and not from a process still holding
+        # it in memory.
         source.unlink()
-        scrubbed = scrub_scratch(scratch_before, work)
+        killed = kill_new_processes(pids_before)
+        stashed_bytes, stashed_detail = diff_and_scrub(tree_before, excludes)
+
+        # Anything left loose in the working directory is a stash too, but the archive and
+        # the file we are about to write are not.
+        for stray in work.iterdir():
+            if stray in (archive, rebuilt):
+                continue
+            size = directory_size(stray) if stray.is_dir() else stray.stat().st_size
+            stashed_bytes += size
+            stashed_detail.append({"path": str(stray), "bytes": size, "why": "created"})
+            if stray.is_dir():
+                shutil.rmtree(stray, ignore_errors=True)
+            else:
+                stray.unlink(missing_ok=True)
 
         started = time.time()
         ok, why = run([str(decompress_sh), str(archive), str(rebuilt)], DECOMPRESS_TIMEOUT)
         unpack_secs = time.time() - started
         if not ok:
-            return fail(f"decompress.sh failed — {why}")
+            return fail(f"decompress.sh failed — {why}", stashed_bytes=stashed_bytes)
         if not rebuilt.is_file():
             return fail("decompress.sh did not produce an output file")
 
@@ -209,9 +360,8 @@ def main() -> int:
                 original_bytes=original_bytes,
             )
 
-        archive_bytes = directory_size(archive)
-        extra_bytes, extra_detail = unshipped_bytes(manifest)
-        footprint = archive_bytes + extra_bytes
+        unshipped, unshipped_detail = unshipped_bytes(manifest)
+        footprint = archive_bytes + unshipped + stashed_bytes
         if footprint <= 0:
             return fail("footprint measured as zero")
 
@@ -226,7 +376,8 @@ def main() -> int:
                 "status": "scored",
                 "original_bytes": original_bytes,
                 "archive_bytes": archive_bytes,
-                "unshipped_bytes": extra_bytes,
+                "unshipped_bytes": unshipped,
+                "stashed_bytes": stashed_bytes,
                 "footprint_bytes": footprint,
                 "ratio": round(ratio, 6),
                 "baseline_ratio": baseline_ratio,
@@ -234,8 +385,9 @@ def main() -> int:
                 "unclipped": round(raw, 6),
                 "compress_seconds": round(pack_secs, 1),
                 "decompress_seconds": round(unpack_secs, 1),
-                "unshipped_detail": extra_detail[:50],
-                "scrubbed_paths": len(scrubbed),
+                "unshipped_detail": unshipped_detail[:50],
+                "stashed_detail": stashed_detail[:50],
+                "processes_killed": len(killed),
             }
         )
         return 0

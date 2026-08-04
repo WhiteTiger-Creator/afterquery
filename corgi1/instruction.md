@@ -70,10 +70,19 @@ table of openings — and the code you write, too. Moving bytes between `out_dir
 source file changes nothing, which is the point. A model is not cheaper for being spelled
 out as a Python literal.
 
-Two practical consequences. Keep scratch files, logs and experiments in `/tmp`, because
-anything left under `/app` is charged for. And delete what you no longer need — a training
-script that has already produced its weights is not required to unpack anything, so
-leaving it in place is a few thousand bytes of pure loss.
+Two practical consequences. Keep scratch files, logs and experiments in `/tmp` while you
+are developing, because anything left under `/app` is charged for. And delete what you no
+longer need — a training script that has already produced its weights is not required to
+unpack anything, so leaving it in place is a few thousand bytes of pure loss.
+
+Packing and unpacking are separate runs, and the archive directory is the only channel
+between them. The filesystem is compared before and after packing: anything created or
+modified anywhere outside the archive during that run is added to your footprint and then
+deleted before the rebuild starts, and any process still running from the packing step is
+stopped. Writing the collection to a scratch path and reading it back therefore costs
+exactly what putting it in the archive would have cost, and it is gone by the time the
+rebuild could open it. Temporary files are fine — clean them up before you exit, or pay
+for them.
 
 Failure is absolute rather than proportional: a rebuild that differs anywhere, a script
 that exits non-zero, a crash, or a run that exceeds its time limit all score zero
