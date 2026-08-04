@@ -10,3 +10,16 @@ extracting from /app/corpus/train.pgn ...
   extracted 14000 games  95/s
   extracted 16000 games  95/s
   extracted 18000 games  95/s
+  extracted 20000 games  94/s
+  extracted 22000 games  94/s
+22000 games  1,449,220 positions  41,859,398 candidates
+  epoch 1/30  3.9288 bits/move  (floor 4.6028, +14.6%)  9s
+  epoch 2/30  3.8426 bits/move  (floor 4.6028, +16.5%)  9s
+  epoch 3/30  3.8064 bits/move  (floor 4.6028, +17.3%)  9s
+  epoch 4/30  3.7859 bits/move  (floor 4.6028, +17.7%)  9s
+  epoch 5/30  3.7724 bits/move  (floor 4.6028, +18.0%)  9s
+  epoch 6/30  3.7623 bits/move  (floor 4.6028, +18.3%)  9s
+  epoch 7/30  3.7545 bits/move  (floor 4.6028, +18.4%)  10s
+  epoch 8/30  3.7483 bits/move  (floor 4.6028, +18.6%)  9s
+  epoch 9/30  3.7432 bits/move  (floor 4.6028, +18.7%)  9s
+  epoch 10/30  3.7387 bits/move  (floor 4.6028, +18.8%)  9s
