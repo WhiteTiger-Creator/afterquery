@@ -1,5 +1,5 @@
 {
   "note": "reward = 0.5 + 0.5 * (reference_time / candidate_time), once every distance matches",
-  "queries": 240,
+  "queries": 60,
   "rounds": 3
 }

@@ -6,8 +6,8 @@ as it is.
 
 ## The network
 
-`data/road.gr.gz` is a road network in DIMACS format: 264,346 nodes and 733,846 directed
-arcs. A `p sp N M` line gives the sizes, then one `a tail head weight` line per arc. Weights
+`data/road.gr.gz` is a road network in DIMACS format: 6,262,104 nodes and 15,248,146
+directed arcs — the western United States. A `p sp N M` line gives the sizes, then one `a tail head weight` line per arc. Weights
 are travel distances — positive integers — and node numbers are one-based.
 
 A query is a source and a target. The answer is the exact length of the shortest directed
@@ -48,7 +48,7 @@ optimising stops paying.
 
 ## How the time is measured
 
-The reference and your implementation are run **alternately**, three times each, over 240
+The reference and your implementation are run **alternately**, three times each, over 60
 queries on the network above, and their **medians** are compared. Interleaving them puts
 whatever else the machine is doing onto both sides rather than onto one, and the median
 discards the worst of what remains. The reference is run from the verifier's own untouched
@@ -70,7 +70,8 @@ The shipped implementation is Dijkstra with a binary heap, and its problem is no
 It is that Dijkstra does not know where the target is. Asked for a route from one side of
 the network to the other, it settles nodes in every direction at once, including all the
 ones leading away from the destination, because nothing in the algorithm distinguishes them.
-On a graph this size, most of the work is exploring places the answer never goes.
+On a network of six million nodes, almost all of the work is exploring places the answer
+never goes.
 
 That is a well-studied problem with a well-studied set of answers, and the useful thing
 about all of them is that they change which nodes get looked at, not which distances come
@@ -93,11 +94,11 @@ trustworthy even when the machine is busy.
     ./selfcheck.sh --rounds 5        steadier medians, slower
     ./selfcheck.sh --queries FILE    a different query set
 
-The development file has 60 queries; the graded one has 240 on the same network. Fixed costs
+The development file has 30 queries; the graded one has 60 on the same network. Fixed costs
 you pay once — reading the graph, loading tables — are amortised over four times as many
 queries there, so a change that trades start-up time for query time will look worse locally
 than it really is. Worth generating your own larger query file to see that effect clearly:
-any pair of node numbers between 1 and 264,346 is a valid query.
+any pair of node numbers between 1 and 6,262,104 is a valid query.
 
 ## Constraints
 
@@ -123,8 +124,8 @@ will:
     cat /app/.timer/remaining_secs
 
 with `alert_30min`, `alert_10min` and `alert_5min` appearing as the end approaches. Check it
-before anything expensive — a full preprocessing build over a quarter of a million nodes is
-minutes, not seconds — and keep enough at the end to run `prepare.sh` and one clean
+before anything expensive — the shipped router alone needs about eight minutes for the
+development queries, and a preprocessing pass over six million nodes is longer still — and keep enough at the end to run `prepare.sh` and one clean
 `selfcheck.sh` on a tree you are happy to be measured on.
 
 Remember that whatever `prepare.sh` produces must be on disk when the timing starts. A
