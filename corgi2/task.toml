@@ -1,0 +1,40 @@
+version = "2.0"
+
+[task]
+name = "afterquery/corgi2"
+description = """
+Improve a molecular property predictor so that it generalises to a structurally different
+region of chemical space. A working but crude pipeline over character counts is supplied;
+the score measures how far the mean absolute error falls on a collection of molecules whose
+ring systems are absent from the training data.
+"""
+
+[metadata]
+author_name = "anonymous"
+author_email = "anonymous"
+category = "machine-learning"
+difficulty = "hard"
+tags = [
+    "molecular-property-prediction",
+    "representation-learning",
+    "distribution-shift",
+    "generalisation",
+    "python",
+]
+languages = ["python"]
+
+[agent]
+# Long-horizon: representation work, then the harder question of what survives the shift.
+timeout_sec = 28800
+
+[verifier]
+# One prediction pass over sixty-six thousand molecules, plus parsing and scoring.
+timeout_sec = 5400
+
+[environment]
+allow_internet = false
+build_timeout_sec = 1800
+cpus = 4
+memory_mb = 16384
+gpus = 0
+storage_mb = 20480

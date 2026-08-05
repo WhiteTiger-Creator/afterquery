@@ -1,0 +1,30 @@
+{
+    "id": "7491f4a6-9d72-40a0-bf3b-38533887ecd8",
+    "started_at": "2026-08-04T16:00:37.019585",
+    "finished_at": "2026-08-04T16:06:13.874580",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 0,
+        "evals": {
+            "nop__adhoc": {
+                "n_trials": 1,
+                "n_errors": 0,
+                "metrics": [
+                    {
+                        "mean": 0.0
+                    }
+                ],
+                "pass_at_k": {},
+                "reward_stats": {
+                    "reward": {
+                        "0.0": [
+                            "corgi1__pcbBFqJ"
+                        ]
+                    }
+                },
+                "exception_stats": {}
+            }
+        }
+    }
+}

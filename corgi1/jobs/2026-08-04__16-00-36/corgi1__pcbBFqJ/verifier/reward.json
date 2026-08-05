@@ -1,0 +1,30 @@
+{
+  "archive_bytes": 1432276,
+  "baseline_ratio": 12.243313,
+  "compress_seconds": 157.5,
+  "decompress_seconds": 162.3,
+  "excluded_mounts": [
+    "/dev/mqueue",
+    "/dev/pts",
+    "/proc",
+    "/proc/bus",
+    "/proc/fs",
+    "/proc/irq",
+    "/proc/sys",
+    "/proc/sysrq-trigger",
+    "/sys",
+    "/sys/fs/cgroup"
+  ],
+  "footprint_bytes": 1432276,
+  "original_bytes": 17535803,
+  "processes_killed": 0,
+  "ratio": 12.243313,
+  "reward": 0.0,
+  "stashed_bytes": 0,
+  "stashed_detail": [],
+  "status": "scored",
+  "target_ratio": 15.117072,
+  "unclipped": -0.0,
+  "unshipped_bytes": 0,
+  "unshipped_detail": []
+}

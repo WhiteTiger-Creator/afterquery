@@ -1,0 +1,72 @@
+{
+  "archive_bytes": 1115857,
+  "baseline_ratio": 12.243313,
+  "compress_seconds": 339.3,
+  "decompress_seconds": 345.2,
+  "excluded_mounts": [
+    "/dev/mqueue",
+    "/dev/pts",
+    "/proc",
+    "/proc/bus",
+    "/proc/fs",
+    "/proc/irq",
+    "/proc/sys",
+    "/proc/sysrq-trigger",
+    "/sys",
+    "/sys/fs/cgroup"
+  ],
+  "footprint_bytes": 1155696,
+  "original_bytes": 17535803,
+  "processes_killed": 0,
+  "ratio": 15.17337,
+  "reward": 1.0,
+  "stashed_bytes": 0,
+  "stashed_detail": [],
+  "status": "scored",
+  "target_ratio": 15.117072,
+  "unclipped": 1.01959,
+  "unshipped_bytes": 39839,
+  "unshipped_detail": [
+    {
+      "bytes": 279,
+      "path": "compress.sh",
+      "why": "modified"
+    },
+    {
+      "bytes": 284,
+      "path": "decompress.sh",
+      "why": "modified"
+    },
+    {
+      "bytes": 193,
+      "path": "refpack/__init__.py",
+      "why": "added"
+    },
+    {
+      "bytes": 6149,
+      "path": "refpack/codec.py",
+      "why": "added"
+    },
+    {
+      "bytes": 10725,
+      "path": "refpack/headers.py",
+      "why": "added"
+    },
+    {
+      "bytes": 5927,
+      "path": "refpack/model.py",
+      "why": "added"
+    },
+    {
+      "bytes": 3190,
+      "path": "refpack/rangecoder.py",
+      "why": "added"
+    },
+    {
+      "bytes": 13092,
+      "path": "refpack/weights.npz.xz",
+      "why": "added"
+    }
+  ]
+}
+reward: 1.000000

@@ -1,0 +1,6 @@
+{
+  "baseline_mae": 0.017082,
+  "molecules": 66486,
+  "note": "baseline is the shipped pipeline; target has been reached on the same collection",
+  "target_mae": 0.014
+}
