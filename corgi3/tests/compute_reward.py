@@ -236,9 +236,11 @@ def main() -> int:
         if cand <= 0:
             return fail("measured time was zero, which cannot be right")
 
+        # Parity with the shipped implementation scores 1.0; every further factor of
+        # speed adds half a point. Correctness has already been established above, and
+        # without it nothing here is reached.
         ratio = base / cand
-        speedup = max(0.0, ratio - 1.0)
-        reward = 0.5 + 0.5 * speedup
+        reward = 0.5 + 0.5 * ratio
 
         write_report(
             {
@@ -246,7 +248,7 @@ def main() -> int:
                 "status": "scored",
                 "correct": True,
                 "ratio": round(ratio, 4),
-                "speedup_term": round(speedup, 4),
+
                 "baseline_seconds": [round(x, 3) for x in base_times],
                 "candidate_seconds": [round(x, 3) for x in cand_times],
                 "baseline_median": round(base, 3),

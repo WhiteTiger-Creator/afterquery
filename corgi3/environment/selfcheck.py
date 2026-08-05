@@ -92,7 +92,7 @@ def main() -> int:
         base = statistics.median(base_times)
         cand = statistics.median(cand_times)
         ratio = base / cand if cand > 0 else 0.0
-        reward = 0.5 + 0.5 * max(0.0, ratio - 1.0)
+        reward = 0.5 + 0.5 * ratio
 
         print(f"queries        {len(reference):,}")
         print(f"  answers      all correct")

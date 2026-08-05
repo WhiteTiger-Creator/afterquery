@@ -39,12 +39,12 @@ output file, the wrong number of lines, and a run that exceeds its limit.
 
 Once every answer matches:
 
-    score = 0.5 + 0.5 × max(0, reference_time / your_time − 1)
+    score = 0.5 + 0.5 × (reference_time / your_time)
 
-Matching the shipped implementation's speed scores 0.5. Twice as fast scores 1.0, four times
-scores 2.0, ten times scores 5.0. There is no cap and no target to reach — every further
-improvement is worth the same as the last, so there is no point at which optimising stops
-paying.
+Matching the shipped implementation's speed scores 1.0. Twice as fast scores 1.5, four times
+scores 2.5, ten times scores 5.5. There is no cap and no target to reach — every further
+factor of speed is worth the same half point as the last, so there is no point at which
+optimising stops paying.
 
 ## How the time is measured
 
