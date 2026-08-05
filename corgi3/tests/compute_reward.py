@@ -79,8 +79,77 @@ def run(cmd, timeout, cwd=None, env=None):
     return proc, "", elapsed
 
 
+#: Filesystem types that cannot hold an ordinary file. Everything else is walked, whatever
+#: it is mounted as — the exclusions come from the live mount table rather than from a list
+#: of paths, because a path list is only ever as good as the author's imagination. /dev is
+#: the case in point: mostly device nodes, but /dev/shm is a tmpfs that holds gigabytes.
+INERT_FSTYPES = frozenset({
+    "autofs", "binfmt_misc", "bpf", "cgroup", "cgroup2", "configfs", "debugfs", "devpts",
+    "fusectl", "mqueue", "nsfs", "proc", "pstore", "rpc_pipefs", "securityfs", "selinuxfs",
+    "sysfs", "tracefs",
+})
+
+
+def inert_mountpoints() -> tuple:
+    skip = {"/proc", "/sys"}
+    try:
+        for line in Path("/proc/mounts").read_text().splitlines():
+            fields = line.split()
+            if len(fields) >= 3 and fields[2] in INERT_FSTYPES:
+                skip.add(fields[1])
+    except OSError:
+        pass
+    return tuple(sorted(skip))
+
+
 def snapshot(root: Path) -> set:
     return {p for p in root.rglob("*") if p.is_file()}
+
+
+def snapshot_tree(excludes: tuple) -> dict:
+    """(size, ctime) for every regular file anywhere the submission could write.
+
+    A cache does not have to live under /app. It can go in /tmp, /dev/shm, /var, or
+    anywhere else in a container that lives for the whole grading run, so the sweep covers
+    all of it. `st_ctime_ns` moves on any write and cannot be set backwards by `utime`.
+    """
+    snap = {}
+    stack = ["/"]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    path = entry.path
+                    if any(path == x or path.startswith(x + "/") for x in excludes):
+                        continue
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(path)
+                        elif entry.is_file(follow_symlinks=False):
+                            st = entry.stat(follow_symlinks=False)
+                            snap[path] = (st.st_size, st.st_ctime_ns)
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return snap
+
+
+def scrub_tree(before: dict, excludes: tuple) -> int:
+    """Delete everything written anywhere since the snapshot."""
+    removed = 0
+    for path, meta in sorted(snapshot_tree(excludes).items()):
+        if before.get(path) == meta:
+            continue
+        try:
+            os.unlink(path)
+            removed += 1
+        except OSError:
+            pass
+    return removed
 
 
 def live_pids() -> set:
@@ -165,6 +234,7 @@ def main() -> int:
 
     try:
         # ---------------------------------------------------------- preparation
+        pids_before = live_pids()
         prepare_sh = APP / "prepare.sh"
         prepare_seconds = 0.0
         if prepare_sh.is_file() and os.access(prepare_sh, os.X_OK):
@@ -174,11 +244,16 @@ def main() -> int:
             if proc is None:
                 return fail(f"prepare.sh failed — {why}")
 
-        # Anything from here on that a timed run creates gets removed between rounds, and
-        # anything it leaves running gets stopped.
-        after_prepare = snapshot(APP)
+        # Preparation has to leave its results on disk. Anything it left *running* is
+        # stopped here, before a single measurement is taken: a process that survives into
+        # the timed rounds can memoise the answers it sees on the first one and hand them
+        # back free on the next two, which measures caching rather than speed.
+        stopped = kill_new(pids_before)
+
+        excludes = inert_mountpoints() + (str(HERE), str(REPORT_DIR), str(work))
+        before_rounds = snapshot_tree(excludes)
         pids_after_prepare = live_pids()
-        stopped = 0
+        scrubbed = 0
 
         # ---------------------------------------------------------- timed rounds
         base_times: list[float] = []
@@ -228,7 +303,7 @@ def main() -> int:
                     first_wrong_query=(wrong or 0) + 1,
                 )
 
-            scrub(APP, after_prepare)
+            scrubbed += scrub_tree(before_rounds, excludes)
             stopped += kill_new(pids_after_prepare)
 
         base = statistics.median(base_times)
@@ -257,6 +332,7 @@ def main() -> int:
                 "queries": n_queries,
                 "rounds": ROUNDS,
                 "processes_stopped": stopped,
+                "files_scrubbed": scrubbed,
                 "note": scoring.get("note", ""),
             }
         )

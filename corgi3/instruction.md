@@ -54,9 +54,15 @@ whatever else the machine is doing onto both sides rather than onto one, and the
 discards the worst of what remains. The reference is run from the verifier's own untouched
 copy, so changing the code under `/app/router` affects only your side of the comparison.
 
-Files created during a *timed* run are deleted before the next one. Answers cached on the
-first round are therefore not there on the second, and a query cache is not a speedup.
-Whatever `prepare.sh` builds is left alone — that is the intended place for precomputation.
+Files written during a *timed* run are deleted before the next one — everywhere, not only
+under `/app`. A cache in `/tmp`, `/dev/shm`, or anywhere else in the container is gone by
+the next round, so answers computed once cannot be handed back free the second time. What
+`prepare.sh` wrote is left alone; that is the intended place for precomputation.
+
+Nothing survives preparation as a *process*, either. Whatever `prepare.sh` starts is stopped
+before the first measurement, and anything a timed round leaves running is stopped after it.
+Preparation has to leave its results on disk — a daemon holding the graph, or the answers,
+in memory is not preparation.
 
 ## Where the time actually goes
 
