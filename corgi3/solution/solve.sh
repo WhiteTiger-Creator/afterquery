@@ -49,26 +49,35 @@ exec python3 -c '
 import sys
 import numpy as np
 sys.path.insert(0, "/app/altrouter")
-from fast import solve_batch
+from fast import solve_batch, sweep_batch
 
 d = np.load("/app/model/graph.npz")
 start, head, weight, n = d["start"], d["head"], d["weight"], int(d["n"])
 
-src, dst = [], []
+kinds, psrc, pdst, ssrc = [], [], [], []
 with open(sys.argv[2]) as fh:
     for line in fh:
-        line = line.strip()
-        if line:
-            a, b = line.split()
-            src.append(int(a) - 1)
-            dst.append(int(b) - 1)
+        parts = line.split()
+        if not parts:
+            continue
+        if parts[0] == "S":
+            kinds.append("S"); ssrc.append(int(parts[1]) - 1)
+        else:
+            kinds.append("P"); psrc.append(int(parts[1]) - 1); pdst.append(int(parts[2]) - 1)
 
-out = solve_batch(start, head, weight,
-                  np.asarray(src, dtype=np.int32),
-                  np.asarray(dst, dtype=np.int32), n)
+point = solve_batch(start, head, weight,
+                    np.asarray(psrc, dtype=np.int32),
+                    np.asarray(pdst, dtype=np.int32), n) if psrc else []
+swept = sweep_batch(start, head, weight,
+                    np.asarray(ssrc, dtype=np.int32), n) if ssrc else []
+
+pi = si = 0
 with open(sys.argv[3], "w") as fh:
-    for v in out:
-        fh.write(f"{int(v)}\n")
+    for k in kinds:
+        if k == "S":
+            fh.write(f"{int(swept[si])}\n"); si += 1
+        else:
+            fh.write(f"{int(point[pi])}\n"); pi += 1
 ' "$1" "$2" "$3"
 SH
 

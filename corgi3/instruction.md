@@ -10,8 +10,16 @@ as it is.
 directed arcs — the western United States. A `p sp N M` line gives the sizes, then one `a tail head weight` line per arc. Weights
 are travel distances — positive integers — and node numbers are one-based.
 
-A query is a source and a target. The answer is the exact length of the shortest directed
-path between them, or `-1` when no path exists.
+Queries come in two kinds, and the file mixes them:
+
+    P <source> <target>    the exact length of the shortest directed path, or -1 if none
+    S <source>             the sum of the distances from that node to everything it reaches
+
+They are not the same problem. A point-to-point query has somewhere to aim, and everything
+that makes those fast works by not exploring in directions the answer never goes. A sweep
+has no target at all: the whole reachable network has to be settled however clever you are,
+so nothing that steers towards a destination helps even slightly. Both are timed together,
+and the score is the total.
 
 ## The contract
 
@@ -20,8 +28,9 @@ Two scripts define the interface. Both already exist.
     /app/solve.sh <graph> <queries> <output>   answer a batch of queries
     /app/prepare.sh <graph>                    optional one-off work on the network
 
-`solve.sh` reads a query file with one `source target` pair per line and writes one line per
-query, in the same order, each the exact distance or `-1`. **Only `solve.sh` is timed.**
+`solve.sh` reads a query file with one query per line and writes one line per query, in the
+same order: the exact distance for a `P` query (`-1` if unreachable), the exact sum for an
+`S` query. **Only `solve.sh` is timed.**
 
 `prepare.sh` runs once before any timing, is not itself timed, and may write whatever it
 likes under `/app`. It receives the network and nothing else — it never sees the queries, so
@@ -48,10 +57,10 @@ optimising stops paying.
 
 ## How the time is measured
 
-The reference and your implementation are run **alternately**, three times each, over 60
-queries on the network above, and their **medians** are compared. Interleaving them puts
-whatever else the machine is doing onto both sides rather than onto one, and the median
-discards the worst of what remains. The reference is run from the verifier's own untouched
+The reference and your implementation are run **alternately**, three times each, over 66
+queries on the network above — 60 point-to-point and 6 sweeps — and their **medians** are
+compared. Interleaving them puts whatever else the machine is doing onto both sides rather
+than onto one, and the median discards the worst of what remains. The reference is run from the verifier's own untouched
 copy, so changing the code under `/app/router` affects only your side of the comparison.
 
 Files written during a *timed* run are deleted before the next one — everywhere, not only
@@ -94,7 +103,8 @@ trustworthy even when the machine is busy.
     ./selfcheck.sh --rounds 5        steadier medians, slower
     ./selfcheck.sh --queries FILE    a different query set
 
-The development file has 30 queries; the graded one has 60 on the same network. Fixed costs
+The development file has 22 queries (20 point, 2 sweep); the graded one has 66 (60 and 6)
+on the same network. Fixed costs
 you pay once — reading the graph, loading tables — are amortised over four times as many
 queries there, so a change that trades start-up time for query time will look worse locally
 than it really is. Worth generating your own larger query file to see that effect clearly:
@@ -140,9 +150,11 @@ wrong distance scores nothing at all. Check correctness after every change, not 
 an optimisation that quietly breaks one query in a thousand is much easier to find when you
 have just made it.
 
-Take the largest cost first and measure rather than assume. The obvious first move helps,
-and it is not the only move; the approaches compose, and the ones that spend preparation to
-save query time compose with the ones that make the inner loop cheaper.
+Take the largest cost first and measure rather than assume, and watch which kind of query
+your change actually helped. The two kinds reward different work, and a technique that
+transforms one of them may do nothing at all for the other — at which point the other is
+where all the remaining time is, and the next improvement is a different piece of work
+rather than more of the last one.
 
 Expect the last improvements to be harder than the first, and expect there to be more of
 them than you think. There is no target here and no ceiling: the gap between exploring a

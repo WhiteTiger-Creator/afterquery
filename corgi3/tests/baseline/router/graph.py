@@ -91,14 +91,21 @@ def load(path: str | Path) -> Graph:
     return Graph(n, start, head, weight)
 
 
-def read_queries(path: str | Path) -> list[tuple[int, int]]:
-    """One `source target` pair per line, one-based as in the graph file."""
+def read_queries(path: str | Path):
+    """One query per line, one-based as in the graph file.
+
+        P <source> <target>     the distance from source to target
+        S <source>              the sum of distances from source to all it reaches
+    """
     out = []
     with open(path) as fh:
         for line in fh:
-            line = line.strip()
-            if not line:
+            parts = line.split()
+            if not parts:
                 continue
-            s, t = line.split()
-            out.append((int(s) - 1, int(t) - 1))
+            kind = parts[0]
+            if kind == "S":
+                out.append(("S", int(parts[1]) - 1))
+            else:
+                out.append(("P", int(parts[1]) - 1, int(parts[2]) - 1))
     return out

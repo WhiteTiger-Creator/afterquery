@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with open(out_path, "w") as fh:
         for d in distances:
-            fh.write("-1\n" if d == float("inf") else f"{int(d)}\n")
+            fh.write(f"{int(d)}\n")
 
     print(f"{len(queries)} queries: load {loaded:.1f}s, solve {solved:.1f}s", file=sys.stderr)
     return 0
