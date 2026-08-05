@@ -1,0 +1,40 @@
+version = "2.0"
+
+[task]
+name = "afterquery/corgi3"
+description = """
+Speed up exact shortest-path queries on a road network without changing a single distance.
+A correct Dijkstra implementation is supplied; the score is how far its query time falls
+once every answer still matches the reference exactly.
+"""
+
+[metadata]
+author_name = "anonymous"
+author_email = "anonymous"
+category = "algorithms"
+difficulty = "hard"
+tags = [
+    "shortest-paths",
+    "graph-algorithms",
+    "performance-optimisation",
+    "road-networks",
+    "python",
+]
+languages = ["python"]
+
+[agent]
+# Long-horizon: goal-directed search, then preprocessing, then a faster inner loop. Each
+# layer is a real piece of work and the last one has no natural stopping point.
+timeout_sec = 28800
+
+[verifier]
+# Three alternating rounds of reference and candidate over 240 queries, plus preparation.
+timeout_sec = 7200
+
+[environment]
+allow_internet = false
+build_timeout_sec = 1800
+cpus = 4
+memory_mb = 16384
+gpus = 0
+storage_mb = 20480

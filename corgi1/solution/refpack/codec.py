@@ -23,8 +23,44 @@ import chess.pgn
 import numpy as np
 
 from . import headers as headers_mod
-from .model import FREQ_TOTAL, board_features, dequantize_weights, frequencies
+from .model import (
+    BOOK_MAX_PLY,
+    FREQ_TOTAL,
+    blend_book,
+    board_features,
+    dequantize_weights,
+    frequencies_from_probs,
+    probabilities,
+)
 from .rangecoder import RangeDecoder, RangeEncoder
+
+
+class Book:
+    """What has been played from each position so far in this archive.
+
+    Keyed on the position itself rather than on the moves that reached it, so transpositions
+    share evidence. Only the opening is remembered: past forty plies almost every position
+    is unique, and storing them costs memory for nothing.
+    """
+
+    __slots__ = ("_counts",)
+
+    def __init__(self) -> None:
+        self._counts: dict[tuple, np.ndarray] = {}
+
+    def lookup(self, board, ply: int):
+        if ply >= BOOK_MAX_PLY:
+            return None
+        return self._counts.get(board._transposition_key())
+
+    def record(self, board, ply: int, index: int, n_moves: int) -> None:
+        if ply >= BOOK_MAX_PLY:
+            return
+        key = board._transposition_key()
+        counts = self._counts.get(key)
+        if counts is None:
+            counts = self._counts[key] = np.zeros(n_moves, dtype=np.float64)
+        counts[index] += 1.0
 
 MAGIC = b"RPK1"
 VERSION = 1
@@ -102,6 +138,7 @@ def compress(input_path, out_dir, weights_path) -> Path:
     header_games: list[list[tuple[str, str]]] = []
     ply_counts = bytearray()
     enc = RangeEncoder()
+    book = Book()
     games = 0
 
     stream = io.StringIO(text)
@@ -121,8 +158,11 @@ def compress(input_path, out_dir, weights_path) -> Path:
                 plies += 1
                 continue
             rows = board_features(board, moves, plies)
-            freqs = frequencies(weights[rows].sum(axis=1))
+            probs = probabilities(weights[rows].sum(axis=1))
+            probs = blend_book(probs, book.lookup(board, plies))
+            freqs = frequencies_from_probs(probs)
             enc.encode(_cumulative(freqs, index), freqs[index], FREQ_TOTAL)
+            book.record(board, plies, index, len(moves))
             board.push(played)
             plies += 1
         ply_counts += _varint(plies)
@@ -163,6 +203,7 @@ def decompress(out_dir, output_path, weights_path) -> Path:
     ply_blob = bz2.decompress(chunks[1])
     dec = RangeDecoder(chunks[2])
 
+    book = Book()
     out = io.StringIO()
     cursor = 0
     for gi in range(games):
@@ -182,7 +223,9 @@ def decompress(out_dir, output_path, weights_path) -> Path:
                 move = moves[0]
             else:
                 rows = board_features(board, moves, ply)
-                freqs = frequencies(weights[rows].sum(axis=1))
+                probs = probabilities(weights[rows].sum(axis=1))
+                probs = blend_book(probs, book.lookup(board, ply))
+                freqs = frequencies_from_probs(probs)
                 target = dec.get_freq(FREQ_TOTAL)
                 running = 0
                 index = 0
@@ -192,6 +235,7 @@ def decompress(out_dir, output_path, weights_path) -> Path:
                         break
                     running += f
                 dec.decode(running, freqs[index])
+                book.record(board, ply, index, len(moves))
                 move = moves[index]
             node = node.add_variation(move)
             board.push(move)

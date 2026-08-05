@@ -121,6 +121,59 @@ def scores_from(weights: np.ndarray, rows: np.ndarray) -> np.ndarray:
     return weights[rows].sum(axis=1)
 
 
+#: Positions past this ply are not remembered. Repetition between games lives in the
+#: opening; deeper positions are nearly all unique, so keeping them costs memory and buys
+#: nothing.
+BOOK_MAX_PLY = 40
+
+#: How fast the book takes over from the model as evidence accumulates. With this value a
+#: position seen once contributes a third of the distribution, seen four times about two
+#: thirds. Low enough that one eccentric game cannot dominate a position.
+BOOK_STRENGTH = 2.0
+
+
+def blend_book(probs: np.ndarray, counts: np.ndarray | None) -> np.ndarray:
+    """Mix the model's distribution with what has been played here before.
+
+    The book is free: both directions of the channel see the same games in the same order
+    and build the same counts, so nothing about it has to be transmitted. Openings repeat
+    heavily within a collection, which is exactly where the model is least certain.
+    """
+    if counts is None:
+        return probs
+    seen = float(counts.sum())
+    if seen <= 0.0:
+        return probs
+    weight = seen / (seen + BOOK_STRENGTH)
+    return (1.0 - weight) * probs + weight * (counts / seen)
+
+
+def frequencies_from_probs(probs: np.ndarray, total: int = FREQ_TOTAL) -> list[int]:
+    """Turn a probability vector into integer frequencies summing to exactly `total`."""
+    n = len(probs)
+    if n == 1:
+        return [total]
+    if n >= total:
+        raise ValueError(f"cannot allocate {total} over {n} symbols")
+
+    spare = total - n
+    exact = probs * spare
+    base = np.floor(exact).astype(np.int64)
+    leftover = spare - int(base.sum())
+    if leftover:
+        frac = exact - base
+        order = np.lexsort((np.arange(n), -frac))
+        base[order[:leftover]] += 1
+    return (base + 1).astype(np.int64).tolist()
+
+
+def probabilities(scores: np.ndarray) -> np.ndarray:
+    """Softmax over the legal moves."""
+    shifted = scores - scores.max()
+    exp = np.exp(shifted)
+    return exp / exp.sum()
+
+
 def frequencies(scores: np.ndarray, total: int = FREQ_TOTAL) -> list[int]:
     """Turn scores into integer frequencies summing to exactly `total`.
 
