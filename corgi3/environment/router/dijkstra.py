@@ -76,16 +76,48 @@ def sweep_total(graph: Graph, source: int) -> int:
     return total
 
 
+def ball_count(graph: Graph, source: int, radius: int) -> int:
+    """How many nodes lie within `radius` of `source`.
+
+    A third shape again. There is no target to steer towards, so goal-directed tricks are
+    useless — but unlike a sweep the search stops early, and most of the network is never
+    touched. What makes this fast is knowing when to stop expanding, not where to go.
+    """
+    start = graph.start
+    head = graph.head
+    weight = graph.weight
+
+    dist = {source: 0}
+    heap = [(0, source)]
+    reached = 0
+
+    while heap:
+        d, u = heappop(heap)
+        if d > dist.get(u, INF):
+            continue
+        reached += 1
+        for i in range(start[u], start[u + 1]):
+            v = head[i]
+            nd = d + weight[i]
+            if nd <= radius and nd < dist.get(v, INF):
+                dist[v] = nd
+                heappush(heap, (nd, v))
+    return reached
+
+
 def answer(graph: Graph, queries) -> list[int]:
     """Answer a batch of queries in order.
 
-    Each query is either ``("P", source, target)`` — the distance between two nodes — or
-    ``("S", source)`` — the sum of distances from one node to everything it reaches.
+    A query is one of ``("P", source, target)`` — the distance between two nodes;
+    ``("S", source)`` — the sum of distances from one node to all it reaches; or
+    ``("B", source, radius)`` — how many nodes lie within a distance of one node.
     """
     out = []
     for query in queries:
         if query[0] == "S":
             out.append(sweep_total(graph, query[1]))
+        elif query[0] == "B":
+            out.append(ball_count(graph, query[1], query[2]))
         else:
             d = shortest_path(graph, query[1], query[2])
             out.append(-1 if d == INF else int(d))

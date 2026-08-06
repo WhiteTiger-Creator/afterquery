@@ -14,12 +14,23 @@ Queries come in two kinds, and the file mixes them:
 
     P <source> <target>    the exact length of the shortest directed path, or -1 if none
     S <source>             the sum of the distances from that node to everything it reaches
+    B <source> <radius>    how many nodes lie within that distance of that node
 
-They are not the same problem. A point-to-point query has somewhere to aim, and everything
-that makes those fast works by not exploring in directions the answer never goes. A sweep
-has no target at all: the whole reachable network has to be settled however clever you are,
-so nothing that steers towards a destination helps even slightly. Both are timed together,
-and the score is the total.
+They are three different problems wearing the same clothes, and what makes each one fast is
+different.
+
+A `P` query has somewhere to aim. Everything that makes those quick works by declining to
+explore in directions the answer never goes.
+
+An `S` query has no target at all, so none of that applies — the whole reachable network
+must be settled however clever you are, and the only thing left to win is the cost of
+settling it.
+
+A `B` query also has no target, but unlike a sweep it stops early and never touches most of
+the network. What makes it quick is knowing when to stop, which is a third thing again.
+
+All three are timed together and the score is the total, so whichever you have not yet
+addressed is where your remaining time is sitting.
 
 ## The contract
 
@@ -29,8 +40,8 @@ Two scripts define the interface. Both already exist.
     /app/prepare.sh <graph>                    optional one-off work on the network
 
 `solve.sh` reads a query file with one query per line and writes one line per query, in the
-same order: the exact distance for a `P` query (`-1` if unreachable), the exact sum for an
-`S` query. **Only `solve.sh` is timed.**
+same order: the exact distance for `P` (`-1` if unreachable), the exact sum for `S`, the
+exact count for `B`. **Only `solve.sh` is timed.**
 
 `prepare.sh` runs once before any timing, is not itself timed, and may write whatever it
 likes under `/app`. It receives the network and nothing else — it never sees the queries, so
@@ -57,8 +68,9 @@ optimising stops paying.
 
 ## How the time is measured
 
-The reference and your implementation are run **alternately**, three times each, over 66
-queries on the network above — 60 point-to-point and 6 sweeps — and their **medians** are
+The reference and your implementation are run **alternately**, three times each, over 101
+queries on the network above — 45 point-to-point, 6 sweeps and 50 ball counts — and their
+**medians** are
 compared. Interleaving them puts whatever else the machine is doing onto both sides rather
 than onto one, and the median discards the worst of what remains. The reference is run from the verifier's own untouched
 copy, so changing the code under `/app/router` affects only your side of the comparison.
@@ -103,8 +115,8 @@ trustworthy even when the machine is busy.
     ./selfcheck.sh --rounds 5        steadier medians, slower
     ./selfcheck.sh --queries FILE    a different query set
 
-The development file has 22 queries (20 point, 2 sweep); the graded one has 66 (60 and 6)
-on the same network. Fixed costs
+The development file has 32 queries (15 point, 2 sweep, 15 ball); the graded one has 101
+(45, 6 and 50) on the same network. Fixed costs
 you pay once — reading the graph, loading tables — are amortised over four times as many
 queries there, so a change that trades start-up time for query time will look worse locally
 than it really is. Worth generating your own larger query file to see that effect clearly:
@@ -156,11 +168,11 @@ wrong distance scores nothing at all. Check correctness after every change, not 
 an optimisation that quietly breaks one query in a thousand is much easier to find when you
 have just made it.
 
-Take the largest cost first and measure rather than assume, and watch which kind of query
-your change actually helped. The two kinds reward different work, and a technique that
-transforms one of them may do nothing at all for the other — at which point the other is
-where all the remaining time is, and the next improvement is a different piece of work
-rather than more of the last one.
+Take the largest cost first and measure rather than assume, and watch **which kind** of
+query your change actually helped. The three kinds reward different work, and a technique
+that transforms one of them may do nothing whatever for the other two — at which point they
+are where all your remaining time is, and the next improvement is a different piece of work
+rather than more of the last one. Time each kind separately; the totals hide this.
 
 Expect the last improvements to be harder than the first, and expect there to be more of
 them than you think. There is no target here and no ceiling: the gap between exploring a

@@ -2,6 +2,6 @@
   "network_bytes": 90580736,
   "network_sha256": "aeb7d846467dac4945b760c9d6a30fff46a743fb71c9d1256dfb97da471fb42d",
   "note": "reward = 0.5 + 0.5 * (reference_time / candidate_time), once every distance matches",
-  "queries": 60,
+  "queries": 101,
   "rounds": 3
 }
