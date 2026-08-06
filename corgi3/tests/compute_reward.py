@@ -17,6 +17,7 @@ the second repetition cannot read what the first one cached.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -209,6 +210,14 @@ def scrub(root: Path, before: set) -> int:
     return removed
 
 
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def read_answers(path: Path) -> list[str] | None:
     try:
         return [line.strip() for line in path.read_text().splitlines() if line.strip() != ""]
@@ -232,6 +241,24 @@ def main() -> int:
     work = Path(tempfile.mkdtemp(prefix="grade-", dir="/tmp"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
 
+    # The network is the input to both sides of the comparison, and it lives where the
+    # submission can write. A substituted graph could cripple the interpreted reference
+    # while leaving a compiled candidate untouched, inflating the ratio without any of the
+    # work the task is about. So: check it against the hash recorded when the task was
+    # built, then take a copy out of reach and run everything from that instead. The check
+    # catches substitution, the copy closes the gap between checking and using.
+    expected = scoring.get("network_sha256")
+    if expected:
+        actual = sha256_file(GRAPH)
+        if actual != expected:
+            return fail(
+                "the road network under /app/data has been altered",
+                expected_sha256=expected,
+                found_sha256=actual,
+            )
+    graph = work / "road.gr.gz"
+    shutil.copy2(GRAPH, graph)
+
     try:
         # ---------------------------------------------------------- preparation
         pids_before = live_pids()
@@ -239,7 +266,7 @@ def main() -> int:
         prepare_seconds = 0.0
         if prepare_sh.is_file() and os.access(prepare_sh, os.X_OK):
             proc, why, prepare_seconds = run(
-                [prepare_sh, GRAPH], PREPARE_TIMEOUT, cwd="/app", env=env
+                [prepare_sh, graph], PREPARE_TIMEOUT, cwd="/app", env=env
             )
             if proc is None:
                 return fail(f"prepare.sh failed — {why}")
@@ -263,7 +290,7 @@ def main() -> int:
         for round_index in range(ROUNDS):
             base_out = work / f"base_{round_index}.txt"
             proc, why, seconds = run(
-                [sys.executable, "-m", "router", GRAPH, QUERIES, base_out],
+                [sys.executable, "-m", "router", graph, QUERIES, base_out],
                 SOLVE_TIMEOUT,
                 cwd=str(BASELINE),
                 env=dict(env, PYTHONPATH=str(BASELINE)),
@@ -279,7 +306,7 @@ def main() -> int:
 
             cand_out = work / f"cand_{round_index}.txt"
             proc, why, seconds = run(
-                [solve_sh, GRAPH, QUERIES, cand_out], SOLVE_TIMEOUT, cwd="/app", env=env
+                [solve_sh, graph, QUERIES, cand_out], SOLVE_TIMEOUT, cwd="/app", env=env
             )
             if proc is None:
                 return fail(f"solve.sh failed — {why}")

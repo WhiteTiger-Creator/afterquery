@@ -123,8 +123,14 @@ will not be the shortest.
 `solve.sh` must be deterministic and self-contained: same inputs, same outputs, reading only
 the graph, the query file, and what `prepare.sh` left behind.
 
-Do not modify `data/`, and leave `.reference/` alone — it is the copy `selfcheck.sh` measures
-you against.
+Do not modify `data/`. The network is checked against a hash recorded when the task was
+built, and a run is scored zero if it no longer matches — it is the input to both sides of
+the comparison, so changing it would be changing the measurement rather than beating it.
+The graph handed to `prepare.sh` and `solve.sh` at scoring time is a verified copy taken
+from somewhere you cannot reach, so **use the path you are given** rather than hard-coding
+`data/road.gr.gz`.
+
+Leave `.reference/` alone too — it is the copy `selfcheck.sh` measures you against.
 
 ## Pacing yourself
 
