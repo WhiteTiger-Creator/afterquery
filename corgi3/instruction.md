@@ -68,8 +68,8 @@ optimising stops paying.
 
 ## How the time is measured
 
-The reference and your implementation are run **alternately**, three times each, over 101
-queries on the network above — 45 point-to-point, 6 sweeps and 50 ball counts — and their
+The reference and your implementation are run **alternately**, three times each, over 56
+queries on the network above — 25 point-to-point, 3 sweeps and 28 ball counts — and their
 **medians** are
 compared. Interleaving them puts whatever else the machine is doing onto both sides rather
 than onto one, and the median discards the worst of what remains. The reference is run from the verifier's own untouched
@@ -115,12 +115,26 @@ trustworthy even when the machine is busy.
     ./selfcheck.sh --rounds 5        steadier medians, slower
     ./selfcheck.sh --queries FILE    a different query set
 
-The development file has 32 queries (15 point, 2 sweep, 15 ball); the graded one has 101
-(45, 6 and 50) on the same network. Fixed costs
+The development file has 21 queries (10 point, 1 sweep, 10 ball); the graded one has 56
+(25, 3 and 28) on the same network. Fixed costs
 you pay once — reading the graph, loading tables — are amortised over four times as many
 queries there, so a change that trades start-up time for query time will look worse locally
 than it really is. Worth generating your own larger query file to see that effect clearly:
 any pair of node numbers between 1 and 6,262,104 is a valid query.
+
+## Time limits
+
+Two limits apply when the work is scored, and both are hard — exceeding either scores zero
+rather than costing partial credit.
+
+    prepare.sh    30 minutes    (1800 seconds), once
+    solve.sh      40 minutes    (2400 seconds), per invocation
+
+The same 2400-second limit is applied to the shipped implementation on the same machine,
+and it needs a small fraction of it, so there is a wide margin before the limit is anywhere
+near reach. It exists to stop a run hanging, not to constrain the design. If you are
+approaching it you have made something slower than what you started with, which the score
+would already be telling you.
 
 ## Constraints
 
@@ -138,9 +152,9 @@ the graph, the query file, and what `prepare.sh` left behind.
 Do not modify `data/`. The network is checked against a hash recorded when the task was
 built, and a run is scored zero if it no longer matches — it is the input to both sides of
 the comparison, so changing it would be changing the measurement rather than beating it.
-The graph handed to `prepare.sh` and `solve.sh` at scoring time is a verified copy taken
-from somewhere you cannot reach, so **use the path you are given** rather than hard-coding
-`data/road.gr.gz`.
+At scoring time the graph is verified against that hash and then copied elsewhere, and it
+is the copy whose path is handed to `prepare.sh` and `solve.sh`. **Use the path you are
+given** rather than hard-coding one.
 
 Leave `.reference/` alone too — it is the copy `selfcheck.sh` measures you against.
 
@@ -152,7 +166,7 @@ will:
     cat /app/.timer/remaining_secs
 
 with `alert_30min`, `alert_10min` and `alert_5min` appearing as the end approaches. Check it
-before anything expensive — the shipped router alone needs about eight minutes for the
+before anything expensive — the shipped router takes minutes, not seconds, on the
 development queries, and a preprocessing pass over six million nodes is longer still — and keep enough at the end to run `prepare.sh` and one clean
 `selfcheck.sh` on a tree you are happy to be measured on.
 

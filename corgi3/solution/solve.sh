@@ -11,6 +11,9 @@
 #      router re-reads a gzipped text file on every single run.
 #
 # Preparation never sees the queries, which is the point: both of these serve any query.
+# Expected result: every answer identical to the shipped router, and a ratio of roughly
+# 13-14x against it, which scores about 7.3 under 0.5 + 0.5 * ratio. A materially different
+# number means the scoring pipeline is not doing what it is supposed to.
 set -euo pipefail
 
 SOLUTION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

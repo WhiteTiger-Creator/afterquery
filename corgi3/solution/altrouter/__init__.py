@@ -1,7 +1,7 @@
-"""altrouter — the reference answer: A* with landmark bounds."""
+"""altrouter — the reference answer: the same algorithm, compiled."""
 
 from __future__ import annotations
 
-from .alt import answer, build, load_tables, shortest_path
+from .build import cache_graph, compile_extension
 
-__all__ = ["answer", "build", "load_tables", "shortest_path"]
+__all__ = ["cache_graph", "compile_extension"]
