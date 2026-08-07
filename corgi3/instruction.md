@@ -7,10 +7,11 @@ as it is.
 ## The network
 
 `data/road.gr.gz` is a road network in DIMACS format: 6,262,104 nodes and 15,248,146
-directed arcs — the western United States. A `p sp N M` line gives the sizes, then one `a tail head weight` line per arc. Weights
-are travel distances — positive integers — and node numbers are one-based.
+directed arcs — the western United States. A `p sp N M` line gives the sizes, then one
+`a tail head weight` line per arc. Weights are travel distances — positive integers — and
+node numbers are one-based.
 
-Queries come in two kinds, and the file mixes them:
+Queries come in three kinds, and the file mixes them:
 
     P <source> <target>    the exact length of the shortest directed path, or -1 if none
     S <source>             the sum of the distances from that node to everything it reaches
@@ -68,12 +69,12 @@ optimising stops paying.
 
 ## How the time is measured
 
-The reference and your implementation are run **alternately**, three times each, over 56
-queries on the network above — 25 point-to-point, 3 sweeps and 28 ball counts — and their
-**medians** are
-compared. Interleaving them puts whatever else the machine is doing onto both sides rather
-than onto one, and the median discards the worst of what remains. The reference is run from the verifier's own untouched
-copy, so changing the code under `/app/router` affects only your side of the comparison.
+The reference and your implementation are run **alternately**, three times each, over 190
+queries on the network above — 100 point-to-point, 10 sweeps and 80 ball counts — and their
+**medians** are compared. Interleaving them puts whatever else the machine is doing onto
+both sides rather than onto one, and the median discards the worst of what remains. The
+reference is run from the verifier's own untouched copy, so changing the code under
+`/app/router` affects only your side of the comparison.
 
 Files written during a *timed* run are deleted before the next one — everywhere, not only
 under `/app`. A cache in `/tmp`, `/dev/shm`, or anywhere else in the container is gone by
@@ -115,12 +116,12 @@ trustworthy even when the machine is busy.
     ./selfcheck.sh --rounds 5        steadier medians, slower
     ./selfcheck.sh --queries FILE    a different query set
 
-The development file has 21 queries (10 point, 1 sweep, 10 ball); the graded one has 56
-(25, 3 and 28) on the same network. Fixed costs
-you pay once — reading the graph, loading tables — are amortised over four times as many
-queries there, so a change that trades start-up time for query time will look worse locally
-than it really is. Worth generating your own larger query file to see that effect clearly:
-any pair of node numbers between 1 and 6,262,104 is a valid query.
+The development file has 74 queries (40 point, 4 sweep, 30 ball); the graded one has 190
+(100, 10 and 80) on the same network. Fixed costs you pay once — reading the graph, loading
+tables — are amortised over roughly two and a half times as many queries there, so a change
+that trades start-up time for query time will look worse locally than it really is. Worth
+generating your own larger query file to see that effect clearly: any pair of node numbers
+between 1 and 6,262,104 is a valid query.
 
 ## Time limits
 
@@ -128,10 +129,10 @@ Two limits apply when the work is scored, and both are hard — exceeding either
 rather than costing partial credit.
 
     prepare.sh    30 minutes    (1800 seconds), once
-    solve.sh      40 minutes    (2400 seconds), per invocation
+    solve.sh      90 minutes    (5400 seconds), per invocation
 
-The same 2400-second limit is applied to the shipped implementation on the same machine,
-and it needs a small fraction of it, so there is a wide margin before the limit is anywhere
+The same 5400-second limit is applied to the shipped implementation on the same machine,
+where it uses well under a fifth of it, so there is a wide margin before the limit is anywhere
 near reach. It exists to stop a run hanging, not to constrain the design. If you are
 approaching it you have made something slower than what you started with, which the score
 would already be telling you.
@@ -167,7 +168,8 @@ will:
 
 with `alert_30min`, `alert_10min` and `alert_5min` appearing as the end approaches. Check it
 before anything expensive — the shipped router takes minutes, not seconds, on the
-development queries, and a preprocessing pass over six million nodes is longer still — and keep enough at the end to run `prepare.sh` and one clean
+development queries, and a preprocessing pass over six million nodes is longer still —
+and keep enough at the end to run `prepare.sh` and one clean
 `selfcheck.sh` on a tree you are happy to be measured on.
 
 Remember that whatever `prepare.sh` produces must be on disk when the timing starts. A

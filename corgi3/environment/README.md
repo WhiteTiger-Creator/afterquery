@@ -9,7 +9,7 @@ Shortest-path queries on a road network.
     selfcheck.sh                       correctness + speed against the shipped router
     router/                            the current implementation
     data/road.gr.gz                    the network: 6,262,104 nodes, 15,248,146 arcs
-    data/queries.dev.txt               21 queries to develop against
+    data/queries.dev.txt               74 queries to develop against
     .reference/                        a pristine copy of the shipped router
 
 ## The network
