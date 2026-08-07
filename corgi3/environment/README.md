@@ -9,7 +9,7 @@ Shortest-path queries on a road network.
     selfcheck.sh                       correctness + speed against the shipped router
     router/                            the current implementation
     data/road.gr.gz                    the network: 6,262,104 nodes, 15,248,146 arcs
-    data/queries.dev.txt               74 queries to develop against
+    data/queries.dev.txt               125 queries to develop against
     .reference/                        a pristine copy of the shipped router
 
 ## The network
@@ -20,14 +20,16 @@ the western United States.
 
 ## The queries
 
-Three kinds, mixed in one file:
+Five kinds, mixed in one file:
 
     P <source> <target>    the shortest distance between two nodes, or -1 if unreachable
     S <source>             the sum of distances from one node to everything it reaches
     B <source> <radius>    how many nodes lie within that distance of that node
+    R <target>             the sum of distances into one node from everything that reaches it
+    K <source> <k>         the distance to the k-th closest node
 
 They are not variants of one problem. What makes each fast is different, and a technique
-that transforms one may do nothing at all for the other two.
+that transforms one may do nothing at all for the others.
 
 ## The current implementation
 

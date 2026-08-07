@@ -97,6 +97,8 @@ def read_queries(path: str | Path):
         P <source> <target>     the distance from source to target
         S <source>              the sum of distances from source to all it reaches
         B <source> <radius>     how many nodes lie within radius of source
+        R <target>              the sum of distances into target from all that reach it
+        K <source> <k>          the distance to the k-th closest node
     """
     out = []
     with open(path) as fh:
@@ -109,6 +111,10 @@ def read_queries(path: str | Path):
                 out.append(("S", int(parts[1]) - 1))
             elif kind == "B":
                 out.append(("B", int(parts[1]) - 1, int(parts[2])))
+            elif kind == "R":
+                out.append(("R", int(parts[1]) - 1))
+            elif kind == "K":
+                out.append(("K", int(parts[1]) - 1, int(parts[2])))
             else:
                 out.append(("P", int(parts[1]) - 1, int(parts[2]) - 1))
     return out

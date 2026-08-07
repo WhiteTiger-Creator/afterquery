@@ -40,7 +40,7 @@ SCORING = DATA / "scoring.json"
 REPORT_DIR = Path(os.environ.get("REWARD_DIR", "/logs/verifier"))
 
 PREPARE_TIMEOUT = int(os.environ.get("PREPARE_TIMEOUT", "1800"))
-SOLVE_TIMEOUT = int(os.environ.get("SOLVE_TIMEOUT", "5400"))
+SOLVE_TIMEOUT = int(os.environ.get("SOLVE_TIMEOUT", "9000"))
 ROUNDS = int(os.environ.get("TIMING_ROUNDS", "3"))
 
 

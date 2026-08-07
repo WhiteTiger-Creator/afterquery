@@ -52,12 +52,14 @@ exec python3 -c '
 import sys
 import numpy as np
 sys.path.insert(0, "/app/altrouter")
-from fast import ball_batch, solve_batch, sweep_batch
+from fast import ball_batch, kth_batch, solve_batch, sweep_batch
 
 d = np.load("/app/model/graph.npz")
 start, head, weight, n = d["start"], d["head"], d["weight"], int(d["n"])
+rstart, rhead, rweight = d["rstart"], d["rhead"], d["rweight"]
 
 kinds, psrc, pdst, ssrc, bsrc, brad = [], [], [], [], [], []
+rtgt, ksrc, kval = [], [], []
 with open(sys.argv[2]) as fh:
     for line in fh:
         parts = line.split()
@@ -67,6 +69,10 @@ with open(sys.argv[2]) as fh:
             kinds.append("S"); ssrc.append(int(parts[1]) - 1)
         elif parts[0] == "B":
             kinds.append("B"); bsrc.append(int(parts[1]) - 1); brad.append(int(parts[2]))
+        elif parts[0] == "R":
+            kinds.append("R"); rtgt.append(int(parts[1]) - 1)
+        elif parts[0] == "K":
+            kinds.append("K"); ksrc.append(int(parts[1]) - 1); kval.append(int(parts[2]))
         else:
             kinds.append("P"); psrc.append(int(parts[1]) - 1); pdst.append(int(parts[2]) - 1)
 
@@ -78,14 +84,23 @@ swept = sweep_batch(start, head, weight,
 balls = ball_batch(start, head, weight,
                    np.asarray(bsrc, dtype=np.int32),
                    np.asarray(brad, dtype=np.int64), n) if bsrc else []
+revs  = sweep_batch(rstart, rhead, rweight,
+                    np.asarray(rtgt, dtype=np.int32), n) if rtgt else []
+kths  = kth_batch(start, head, weight,
+                  np.asarray(ksrc, dtype=np.int32),
+                  np.asarray(kval, dtype=np.int64), n) if ksrc else []
 
-pi = si = bi = 0
+pi = si = bi = ri = ki = 0
 with open(sys.argv[3], "w") as fh:
     for k in kinds:
         if k == "S":
             fh.write(f"{int(swept[si])}\n"); si += 1
         elif k == "B":
             fh.write(f"{int(balls[bi])}\n"); bi += 1
+        elif k == "R":
+            fh.write(f"{int(revs[ri])}\n"); ri += 1
+        elif k == "K":
+            fh.write(f"{int(kths[ki])}\n"); ki += 1
         else:
             fh.write(f"{int(point[pi])}\n"); pi += 1
 ' "$1" "$2" "$3"

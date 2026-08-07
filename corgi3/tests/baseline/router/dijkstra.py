@@ -105,19 +105,67 @@ def ball_count(graph: Graph, source: int, radius: int) -> int:
     return reached
 
 
+def reverse_sweep_total(graph: Graph, target: int, reverse: Graph) -> int:
+    """The sum of distances *into* `target` from everything that can reach it.
+
+    A fourth shape. Everything above searches outwards from a source; this one searches
+    backwards from a destination, which needs the arcs turned around. A structure built for
+    forward search does not answer it, and building the reverse takes memory of its own.
+    """
+    return sweep_total(reverse, target)
+
+
+def kth_nearest(graph: Graph, source: int, k: int) -> int:
+    """The distance to the k-th closest node, counting the source itself as the first.
+
+    A fifth shape, and the pruning is different again: there is no radius to stop at and no
+    target to aim for, only a count. The search ends when enough nodes have been settled,
+    so what matters is settling them in the cheapest possible order and stopping dead.
+    """
+    start = graph.start
+    head = graph.head
+    weight = graph.weight
+
+    dist = {source: 0}
+    heap = [(0, source)]
+    settled = 0
+
+    while heap:
+        d, u = heappop(heap)
+        if d > dist.get(u, INF):
+            continue
+        settled += 1
+        if settled >= k:
+            return d
+        for i in range(start[u], start[u + 1]):
+            v = head[i]
+            nd = d + weight[i]
+            if nd < dist.get(v, INF):
+                dist[v] = nd
+                heappush(heap, (nd, v))
+    return -1
+
+
 def answer(graph: Graph, queries) -> list[int]:
     """Answer a batch of queries in order.
 
-    A query is one of ``("P", source, target)`` — the distance between two nodes;
-    ``("S", source)`` — the sum of distances from one node to all it reaches; or
-    ``("B", source, radius)`` — how many nodes lie within a distance of one node.
+    A query is one of ``("P", source, target)``, ``("S", source)``, ``("B", source, radius)``,
+    ``("R", target)`` — the sum of distances *into* a node — or ``("K", source, k)`` — the
+    distance to the k-th closest node.
     """
+    reverse = None
     out = []
     for query in queries:
         if query[0] == "S":
             out.append(sweep_total(graph, query[1]))
         elif query[0] == "B":
             out.append(ball_count(graph, query[1], query[2]))
+        elif query[0] == "R":
+            if reverse is None:
+                reverse = graph.reversed()
+            out.append(reverse_sweep_total(graph, query[1], reverse))
+        elif query[0] == "K":
+            out.append(kth_nearest(graph, query[1], query[2]))
         else:
             d = shortest_path(graph, query[1], query[2])
             out.append(-1 if d == INF else int(d))

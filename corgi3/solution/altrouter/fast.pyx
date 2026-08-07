@@ -169,6 +169,63 @@ def ball_batch(cnp.ndarray[I32, ndim=1] start,
     return out
 
 
+def kth_batch(cnp.ndarray[I32, ndim=1] start,
+              cnp.ndarray[I32, ndim=1] head,
+              cnp.ndarray[I32, ndim=1] weight,
+              cnp.ndarray[I32, ndim=1] sources,
+              cnp.ndarray[I64, ndim=1] ks,
+              int n):
+    """Distance to the k-th closest node. Stop as soon as enough have been settled."""
+    cdef Py_ssize_t q, nq = sources.shape[0]
+    cdef cnp.ndarray[I64, ndim=1] out = np.empty(nq, dtype=np.int64)
+
+    cdef long long* dist = <long long*> malloc(n * sizeof(long long))
+    cdef long long* hd = <long long*> malloc((2 * head.shape[0] + 16) * sizeof(long long))
+    cdef int* hn = <int*> malloc((2 * head.shape[0] + 16) * sizeof(int))
+    if dist == NULL or hd == NULL or hn == NULL:
+        raise MemoryError()
+
+    cdef I32* s_ptr = &start[0]
+    cdef I32* h_ptr = &head[0]
+    cdef I32* w_ptr = &weight[0]
+
+    cdef Py_ssize_t size, i
+    cdef long long d, nd, k, settled, answer
+    cdef int u, v, src
+
+    try:
+        for q in range(nq):
+            src = sources[q]
+            k = ks[q]
+            for i in range(n):
+                dist[i] = INF
+            dist[src] = 0
+            size = 0
+            _push(hd, hn, &size, 0, src)
+            settled = 0
+            answer = -1
+            while size > 0:
+                _pop(hd, hn, &size, &d, &u)
+                if d > dist[u]:
+                    continue
+                settled += 1
+                if settled >= k:
+                    answer = d
+                    break
+                for i in range(s_ptr[u], s_ptr[u + 1]):
+                    v = h_ptr[i]
+                    nd = d + w_ptr[i]
+                    if nd < dist[v]:
+                        dist[v] = nd
+                        _push(hd, hn, &size, nd, v)
+            out[q] = answer
+    finally:
+        free(dist)
+        free(hd)
+        free(hn)
+    return out
+
+
 def solve_batch(cnp.ndarray[I32, ndim=1] start,
                 cnp.ndarray[I32, ndim=1] head,
                 cnp.ndarray[I32, ndim=1] weight,

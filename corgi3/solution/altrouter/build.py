@@ -43,6 +43,7 @@ def cache_graph(graph_path: str) -> Path:
     from router.graph import load
 
     graph = load(graph_path)
+    reverse = graph.reversed()   # reverse-direction queries need their own structure
     CACHE.mkdir(parents=True, exist_ok=True)
     out = CACHE / "graph.npz"
     np.savez(
@@ -50,6 +51,9 @@ def cache_graph(graph_path: str) -> Path:
         start=np.asarray(graph.start, dtype=np.int32),
         head=np.asarray(graph.head, dtype=np.int32),
         weight=np.asarray(graph.weight, dtype=np.int32),
+        rstart=np.asarray(reverse.start, dtype=np.int32),
+        rhead=np.asarray(reverse.head, dtype=np.int32),
+        rweight=np.asarray(reverse.weight, dtype=np.int32),
         n=np.int32(graph.n),
     )
     return out

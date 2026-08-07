@@ -28,9 +28,9 @@ languages = ["python"]
 timeout_sec = 28800
 
 [verifier]
-# Three alternating rounds of reference and candidate over 190 queries, plus preparation.
+# Three alternating rounds of reference and candidate over 314 queries, plus preparation.
 # Generous against the measured baseline so the reference never risks its own limits.
-timeout_sec = 14400
+timeout_sec = 28800
 
 [environment]
 allow_internet = false
